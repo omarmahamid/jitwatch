@@ -89,7 +89,13 @@ public final class JitWatchMcpServer {
 			LoggerFactory.setLogFile(config.logFile());
 		}
 
-		new JitWatchMcpServer(config, new CallLog(stderr, config.wantsStackTraces())).run(protocolOut);
+		CallLog log = new CallLog(stderr, config.wantsStackTraces());
+
+		for (String warning : config.warnings()) {
+			log.note(warning);
+		}
+
+		new JitWatchMcpServer(config, log).run(protocolOut);
 	}
 
 	private void run(PrintStream protocolOut) throws Exception {

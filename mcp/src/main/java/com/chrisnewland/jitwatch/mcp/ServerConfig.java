@@ -20,7 +20,7 @@ import com.chrisnewland.freelogj.Logger;
  * @param httpPort serve HTTP on this port; 0 means stdio
  */
 public record ServerConfig(List<Path> allowedRoots, int maxSessions, int maxListItems, int maxAnswerChars,
-		Logger.LogLevel logLevel, Path logFile, int httpPort) {
+		Logger.LogLevel logLevel, Path logFile, int httpPort, List<String> warnings) {
 
 	private static final int DEFAULT_MAX_SESSIONS = 4;
 
@@ -58,6 +58,10 @@ public record ServerConfig(List<Path> allowedRoots, int maxSessions, int maxList
 		Logger.LogLevel logLevel = DEFAULT_LOG_LEVEL;
 		Path logFile = null;
 
+		// Parsing happens before logging is configured, so a complaint is carried out
+		// and logged once there is somewhere to log it.
+		List<String> warnings = new ArrayList<>();
+
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
 				case "--allowed-root":
@@ -86,7 +90,7 @@ public record ServerConfig(List<Path> allowedRoots, int maxSessions, int maxList
 
 				case "--log-level":
 					if (i + 1 < args.length) {
-						logLevel = level(args[++i], logLevel);
+						logLevel = level(args[++i], logLevel, warnings);
 					}
 					break;
 
@@ -109,16 +113,16 @@ public record ServerConfig(List<Path> allowedRoots, int maxSessions, int maxList
 			}
 		}
 
-		return new ServerConfig(readable(roots), maxSessions, maxListItems, maxAnswerChars, logLevel, logFile,
-				httpPort);
+		return new ServerConfig(readable(roots, warnings), maxSessions, maxListItems, maxAnswerChars, logLevel, logFile,
+				httpPort, warnings);
 	}
 
-	private static Logger.LogLevel level(String name, Logger.LogLevel fallback) {
+	private static Logger.LogLevel level(String name, Logger.LogLevel fallback, List<String> warnings) {
 		try {
 			return Logger.LogLevel.valueOf(name.toUpperCase(Locale.ROOT));
 		}
 		catch (IllegalArgumentException e) {
-			System.err.println("[jitwatch-mcp] unknown --log-level '" + name + "', using " + fallback
+			warnings.add("unknown --log-level '" + name + "', using " + fallback
 					+ ". Valid: TRACE DEBUG INFO WARN ERROR FATAL");
 
 			return fallback;
@@ -126,7 +130,7 @@ public record ServerConfig(List<Path> allowedRoots, int maxSessions, int maxList
 	}
 
 	/** Resolves symlinks so the containment check cannot be walked around. */
-	private static List<Path> readable(List<Path> roots) {
+	private static List<Path> readable(List<Path> roots, List<String> warnings) {
 		List<Path> real = new ArrayList<>();
 
 		for (Path root : roots) {
@@ -134,7 +138,7 @@ public record ServerConfig(List<Path> allowedRoots, int maxSessions, int maxList
 				real.add(root.toRealPath());
 			}
 			catch (Exception e) {
-				System.err.println("[jitwatch-mcp] ignoring unreadable allowed root: " + root);
+				warnings.add("ignoring unreadable allowed root: " + root);
 			}
 		}
 
